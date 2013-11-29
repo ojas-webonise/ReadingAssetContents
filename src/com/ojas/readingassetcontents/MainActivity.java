@@ -4,14 +4,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.regex.Pattern;
-
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.res.AssetManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Menu;
 import android.view.View;
 import android.widget.TextView;
 
+@SuppressLint("HandlerLeak")
+@SuppressWarnings("unchecked")
 public class MainActivity extends Activity {
 
 	private TextView editText;
@@ -20,6 +27,7 @@ public class MainActivity extends Activity {
 //	private Whitelist whitelist;
 	String [] list;
 	private String strFiles;
+	private searchTask searchTask;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -28,6 +36,29 @@ public class MainActivity extends Activity {
 
 		textView = (TextView)findViewById(R.id.textView);
 		editText = (TextView)findViewById(R.id.editText);
+		
+		
+		searchTask = new searchTask();
+		editText.addTextChangedListener(new TextWatcher() {
+			
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+				if (searchTask != null) {
+					searchTask.cancel(true);
+					searchTask = null;
+					searchTask = new searchTask();
+				}
+			}
+			
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count,	int after) {
+			}
+			
+			@Override
+			public void afterTextChanged(Editable s) {
+				searchTask.execute(new String[]{s.toString()});
+			}
+		});
 		asm = getAssets();
 //		whitelist = Whitelist.none();
 		try {
@@ -36,12 +67,53 @@ public class MainActivity extends Activity {
 			e.printStackTrace();
 		}
 	}
+	
+	@SuppressWarnings("rawtypes")
+	class searchTask extends AsyncTask {
+		
+		boolean isCancled = false;
+		private searchTask mSearchTask;
+		
+		public searchTask getTaskInstance(){
+			if (mSearchTask == null) {
+				mSearchTask = new searchTask();
+			}
+			return mSearchTask;
+		}
+		
+		@Override
+		protected Object doInBackground(Object... params) {
+			if (isCancled) {
+				return null;
+			} else {
+				strFiles = listAssetFiles(params[0].toString());				
+			}
+			return null;
+		}
+		
+		@Override
+		protected void onCancelled() {
+			super.onCancelled();
+			this.isCancled = true;
+		}
+		
+		@Override
+		protected void onPostExecute(Object result) {
+			super.onPostExecute(result);
+			handler.sendEmptyMessage(0);
+		}
+	}
 
-	private boolean listAssetFiles() {
+	Handler handler = new Handler() {
+		public void handleMessage(Message msg) {
+			textView.setText(strFiles);
+		}
+	};
+	
+	private String listAssetFiles(CharSequence strTextToSearch) {
 		System.out.println(">>>>>"+ System.currentTimeMillis());
-		String strTextToSearch = editText.getText().toString();
 		strFiles = "Searched text "+strTextToSearch + "\n" ;
-		textView.setText("Searched text "+strTextToSearch + "\n");
+//		textView.setText("Searched text "+strTextToSearch + "\n");
 		if (list.length > 0) {
 			// This is a folder
 			for (String file : list) {
@@ -55,7 +127,8 @@ public class MainActivity extends Activity {
 				// boolean isPresent = strFileContents.toLowerCase(Locale.getDefault()).contains(strTextToSearch);
 
 				// takes 1-2 miliseconds
-				boolean isPresent = Pattern.compile(strTextToSearch,Pattern.CASE_INSENSITIVE).matcher(strFileContents).find();
+				boolean isPresent = Pattern.compile(strTextToSearch.toString(),
+						Pattern.CASE_INSENSITIVE).matcher(strFileContents).find();
 				if (isPresent) {
 					strFiles += " Found in file : "+ file + "\n";
 				}
@@ -65,9 +138,9 @@ public class MainActivity extends Activity {
 			// This is a file
 			// TODO: add file name to an array list
 		}
-		textView.setText(strFiles);
-		System.out.println(">>>>>"+ System.currentTimeMillis());
-		return true; 
+//		textView.setText(strFiles);
+//		System.out.println(">>>>>"+ System.currentTimeMillis());
+		return strFiles; 
 	} 
 
 	private String readTxt(String strFileName){
@@ -109,7 +182,7 @@ public class MainActivity extends Activity {
 			}
 			inputStream.close();
 		} catch (IOException e) {
-			e.printStackTrace();
+			e.printStackTrace();mayInterruptIfRunning
 		}*/
 
 
@@ -123,7 +196,7 @@ public class MainActivity extends Activity {
 	}
 
 	public void onClickSearchText(View view) {
-		listAssetFiles();
+//		listAssetFiles();
 	}
 
 	@Override
